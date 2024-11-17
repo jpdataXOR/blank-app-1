@@ -1,5 +1,6 @@
 import streamlit as st
 from openai import OpenAI
+import time
 
 # Function to get API key from the URL
 def get_api_key_from_url():
@@ -49,7 +50,7 @@ else:
 
 # Chat UI (if API key and Assistant are available)
 if api_key and "assistant" in locals():
-    st.title("Chat with OpenAI Assistant")
+    st.title("Chat with HR Assistant")
     st.sidebar.title("Instructions")
     st.sidebar.info(
         "Start a conversation with your Assistant! Your conversation history will persist during this session."
@@ -70,13 +71,10 @@ if api_key and "assistant" in locals():
             # Create a thread for the conversation (if not already created)
             if "thread" not in st.session_state:
                 st.session_state.thread = client.beta.threads.create()
-                #st.sidebar.success(f"Thread created successfully! Thread ID: {st.session_state.thread.id}")
                 st.sidebar.success(f"Thread created successfully! Thread ID ")
             else:
                 # If thread already exists, print thread details
                 thread_details = client.beta.threads.retrieve(st.session_state.thread.id)
-                #st.sidebar.info(f"Thread already exists! Thread ID: {st.session_state.thread.id}")
-                #st.sidebar.info(f"Thread Details: {thread_details}")
 
             # Add user message to the thread
             message = client.beta.threads.messages.create(
@@ -87,6 +85,10 @@ if api_key and "assistant" in locals():
             
             st.session_state.conversation.append({"role": "user", "content": user_message})
             st.sidebar.info(f"User message added: {user_message}")
+
+            # Display "Waiting..." while the Assistant is processing
+            st.write("**Waiting for Assistant's response...**")
+            st.spinner("Assistant is thinking...")
 
             # Run the Assistant to generate a response
             run_response = client.beta.threads.runs.create_and_poll(
@@ -121,6 +123,8 @@ if api_key and "assistant" in locals():
     st.subheader("Conversation")
     for message in reversed(st.session_state.conversation):  # Reversed to show latest message first
         if message["role"] == "user":
-            st.write(f"**You:** {message['content']}")
+            # Style for user messages
+            st.markdown(f'<div style="background-color: #E0F7FA; padding: 10px; border-radius: 10px; margin-bottom: 10px;">**You:** {message["content"]}</div>', unsafe_allow_html=True)
         else:
-            st.write(f"**Assistant:** {message['content']}")
+            # Style for assistant messages
+            st.markdown(f'<div style="background-color: #F1F8E9; padding: 10px; border-radius: 10px; margin-bottom: 10px;">**Assistant:** {message["content"]}</div>', unsafe_allow_html=True)
