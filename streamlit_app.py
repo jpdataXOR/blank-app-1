@@ -1,22 +1,26 @@
 import streamlit as st
+import urllib.parse  # To decode the API key
 from openai import OpenAI
 import time
 
-# Function to get API key from the URL
+# Function to get API key from the URL using the experimental method
 def get_api_key_from_url():
-    query_params = st.query_params
-    return query_params.get("api_key", [None])[0]
+    query_params = st.experimental_get_query_params()  # Use experimental_get_query_params()
+    api_key = query_params.get("api_key", [None])[0]
+    if api_key:
+        api_key = urllib.parse.unquote(api_key)  # Decode the API key if needed
+    return api_key
 
 # Get the API key from the URL
 api_key = get_api_key_from_url()
 
-# Notify the user
+# Notify the user if the API key is found or not
 if api_key:
-    st.sidebar.success("API key loaded from URL."+api_key)
+    st.sidebar.success("API key loaded from URL.")
 else:
     st.sidebar.warning("No API key found in the URL. Please provide one or enter it manually.")
 
-# Input field for the API key (fallback if not in URL or sanitized)
+# Input field for the API key (fallback if not in URL)
 api_key = st.text_input(
     "Enter your OpenAI API Key:",
     value=api_key if api_key else "",
