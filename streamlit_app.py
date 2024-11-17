@@ -70,12 +70,13 @@ if api_key and "assistant" in locals():
             # Create a thread for the conversation (if not already created)
             if "thread" not in st.session_state:
                 st.session_state.thread = client.beta.threads.create()
-                st.sidebar.success(f"Thread created successfully! Thread ID: {st.session_state.thread.id}")
+                #st.sidebar.success(f"Thread created successfully! Thread ID: {st.session_state.thread.id}")
+                st.sidebar.success(f"Thread created successfully! Thread ID ")
             else:
                 # If thread already exists, print thread details
                 thread_details = client.beta.threads.retrieve(st.session_state.thread.id)
-                st.sidebar.info(f"Thread already exists! Thread ID: {st.session_state.thread.id}")
-                st.sidebar.info(f"Thread Details: {thread_details}")
+                #st.sidebar.info(f"Thread already exists! Thread ID: {st.session_state.thread.id}")
+                #st.sidebar.info(f"Thread Details: {thread_details}")
 
             # Add user message to the thread
             message = client.beta.threads.messages.create(
@@ -103,8 +104,8 @@ if api_key and "assistant" in locals():
 
                 # Get the Assistant's latest response from the list of messages
                 if messages.data:
-                    #print(messages.data[0])
-                    assistant_message = messages.data[0].content[0].text.value  # Accessing the first TextContentBlock in the content
+                    # Access the first TextContentBlock in the content
+                    assistant_message = messages.data[0].content[0].text.value
                     
                     st.session_state.conversation.append({"role": "assistant", "content": assistant_message})
                     st.sidebar.success("Assistant response received.")
@@ -116,9 +117,9 @@ if api_key and "assistant" in locals():
         except Exception as e:
             st.error(f"Error interacting with Assistant: {e}")
 
-    # Display conversation history
+    # Display conversation history (latest message at the top)
     st.subheader("Conversation")
-    for message in st.session_state.conversation:
+    for message in reversed(st.session_state.conversation):  # Reversed to show latest message first
         if message["role"] == "user":
             st.write(f"**You:** {message['content']}")
         else:
