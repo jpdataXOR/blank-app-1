@@ -12,7 +12,7 @@ api_key = get_api_key_from_url()
 
 # Notify the user
 if api_key:
-    st.sidebar.success("API key loaded from URL.")
+    st.sidebar.success("API key loaded from URL."+api_key)
 else:
     st.sidebar.warning("No API key found in the URL. Please provide one or enter it manually.")
 
