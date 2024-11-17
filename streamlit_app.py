@@ -7,18 +7,12 @@ def get_api_key_from_url():
     query_params = st.query_params
     return query_params.get("api_key", [None])[0]
 
-# Function to redirect to a sanitized URL
-def sanitize_url():
-    # Clear all query parameters to sanitize the URL
-    st.experimental_set_query_params()
-
 # Get the API key from the URL
 api_key = get_api_key_from_url()
 
-# Notify the user and sanitize the URL if the key is provided
+# Notify the user
 if api_key:
-    st.sidebar.success("API key loaded from URL. Redirecting to sanitized URL...")
-    sanitize_url()
+    st.sidebar.success("API key loaded from URL.")
 else:
     st.sidebar.warning("No API key found in the URL. Please provide one or enter it manually.")
 
