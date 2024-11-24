@@ -112,43 +112,74 @@ with tab1:
             )
 
 # File Management Tab
+# File Management Tab
 with tab2:
     st.title("File Management")
     st.sidebar.info("Upload files to be used with the Assistant.")
 
+    # Step 1: Upload a File to OpenAI
     uploaded_file = st.file_uploader("Upload a File", type=["txt", "csv", "json", "pdf"])
+
     if uploaded_file:
         temp_path = f"temp_{uploaded_file.name}"
         try:
+            # Handle PDF files separately (convert to text)
             if uploaded_file.type == "application/pdf":
                 pdf_reader = PdfReader(uploaded_file)
                 pdf_text = "".join(page.extract_text() for page in pdf_reader.pages)
                 with open(temp_path, "w") as temp_file:
                     temp_file.write(pdf_text)
             else:
+                # Save other file types as binary
                 with open(temp_path, "wb") as temp_file:
                     temp_file.write(uploaded_file.getbuffer())
 
+            # Upload the file to OpenAI
             with open(temp_path, "rb") as file:
-                file_response = client.files.create(file=file, purpose="fine-tune")
+                file_response = client.files.create(file=file, purpose="assistants")
                 st.success(f"File '{uploaded_file.name}' uploaded successfully!")
+
         except Exception as e:
             st.error(f"Failed to upload file: {e}")
         finally:
+            # Clean up temporary file after upload
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
-    # List uploaded files
-    st.subheader("Uploaded Files")
+    # Step 2: List uploaded files from OpenAI
+    st.subheader("Uploaded Files in OpenAI")
     try:
-        files = client.files.list()
+        files = client.files.list()  # Fetch list of files
         if files.get("data"):
+            # Display the list of files with checkboxes to associate them with the HR Assistant
             for file in files["data"]:
-                st.write(f"File Name: {file['filename']}, ID: {file['id']}")
+                file_name = file['filename']
+                file_id = file['id']
+                if st.checkbox(f"Associate {file_name}", key=f"associate_{file_id}"):
+                    st.write(f"File ID: {file_id} will be associated with the Assistant.")
+                else:
+                    st.write(f"File ID: {file_id} not selected.")
         else:
             st.info("No files uploaded yet.")
     except Exception as e:
         st.error(f"Failed to fetch files: {e}")
+
+    # Step 3: Associate selected files with the Assistant
+    if st.button("Associate Selected Files with HR Assistant"):
+        selected_files = [file['id'] for file in files["data"] if st.session_state.get(f"associate_{file['id']}")]
+        if selected_files:
+            try:
+                # Associate the files with the Assistant using the OpenAI API
+                assistant_id = "asst_FRTeSfXQxwiJAkYZpAXfagCK"  # Replace with actual assistant ID
+                updated_assistant = client.beta.assistants.update(
+                    assistant_id=assistant_id,
+                    tools=[{"type": "file_search", "file_ids": selected_files}],  # Linking files to Assistant
+                )
+                st.success(f"Selected files successfully associated with Assistant '{updated_assistant.name}'.")
+            except Exception as e:
+                st.error(f"Failed to associate files: {e}")
+        else:
+            st.warning("No files selected to associate.")
 
 # Modify System Prompt Tab
 # Modify System Prompt tab
