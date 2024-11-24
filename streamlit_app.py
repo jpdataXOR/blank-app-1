@@ -133,7 +133,23 @@ with tab2:
     vector_store_id = st.text_input("Enter Vector Store ID to Manage Files:")
     if vector_store_id:
         st.subheader(f"Files in Vector Store: {vector_store_id}")
+    # Fetch files in a vector store
         try:
+            vector_store_files = client.beta.vector_stores.files.list(vector_store_id=vector_store_id)
+
+            # Check if the 'data' attribute contains files
+            if vector_store_files.data and isinstance(vector_store_files.data, list):
+                st.subheader(f"Files in Vector Store {vector_store_id}")
+                for file in vector_store_files.data:
+                    st.write(f"**File ID:** {file.id}")
+                    st.write(f"**Created At:** {file.created_at}")
+                    st.write(f"**Vector Store ID:** {file.vector_store_id}")
+                    st.write("---")
+            else:
+                st.info("No files found in this vector store.")
+        except Exception as e:
+            st.error(f"Failed to fetch files in vector store {vector_store_id}: {e}")
+
             # List files in the selected vector store
             vector_store_files = client.beta.vector_stores.files.list(vector_store_id=vector_store_id)
             if vector_store_files.data:
