@@ -113,74 +113,92 @@ with tab1:
 
 # File Management Tab
 with tab2:
-    st.title("File Management")
-    st.sidebar.info("Upload files to be used with the Assistant.")
+    st.title("Vector Store Management")
+    st.sidebar.info("Manage vector stores and associated files.")
 
-    # Step 1: Upload a File to OpenAI
-    uploaded_file = st.file_uploader("Upload a File", type=["txt", "csv", "json", "pdf"])
-
-    if uploaded_file:
-        temp_path = f"temp_{uploaded_file.name}"
-        try:
-            # Handle PDF files separately (convert to text)
-            if uploaded_file.type == "application/pdf":
-                pdf_reader = PdfReader(uploaded_file)
-                pdf_text = "".join(page.extract_text() for page in pdf_reader.pages)
-                with open(temp_path, "w") as temp_file:
-                    temp_file.write(pdf_text)
-            else:
-                # Save other file types as binary
-                with open(temp_path, "wb") as temp_file:
-                    temp_file.write(uploaded_file.getbuffer())
-
-            # Upload the file to OpenAI
-            with open(temp_path, "rb") as file:
-                file_response = client.files.create(file=file, purpose="assistants")
-                st.success(f"File '{uploaded_file.name}' uploaded successfully!")
-
-        except Exception as e:
-            st.error(f"Failed to upload file: {e}")
-        finally:
-            # Clean up temporary file after upload
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-
-    # Step 2: List uploaded files from OpenAI
-    st.subheader("Uploaded Files in OpenAI")
+    # List all vector stores
+    st.subheader("List of Vector Stores")
     try:
-        files = client.files.list()  # Fetch list of files
-        if files.data:
-            # Display the list of files with checkboxes to associate them with the HR Assistant
-            for file in files.data:
-                file_name = file.filename
-                file_id = file.id
-                # Checkbox to select which files to associate
-                if st.checkbox(f"Associate {file_name}", key=f"associate_{file_id}"):
-                    st.write(f"File ID: {file_id} will be associated with the Assistant.")
-                else:
-                    st.write(f"File ID: {file_id} not selected.")
+        vector_stores = client.beta.vector_stores.list()
+        if vector_stores.data:
+            for store in vector_stores.data:
+                st.write(f"**Name:** {store.name}, **ID:** {store.id}")
+                st.write(f"**Created At:** {store.created_at}, **Total Files:** {store.file_counts['total']}")
         else:
-            st.info("No files uploaded yet.")
+            st.info("No vector stores found.")
     except Exception as e:
-        st.error(f"Failed to fetch files: {e}")
+        st.error(f"Failed to fetch vector stores: {e}")
 
-    # Step 3: Associate selected files with the Assistant
-    if st.button("Associate Selected Files with HR Assistant"):
-        # Retrieve selected files from session state
-        selected_files = [file.id for file in files.data if st.session_state.get(f"associate_{file.id}")]
-        if selected_files:
+    # Select a vector store to manage files
+    vector_store_id = st.text_input("Enter Vector Store ID to Manage Files:")
+    if vector_store_id:
+        st.subheader(f"Files in Vector Store: {vector_store_id}")
+        try:
+            # List files in the selected vector store
+            vector_store_files = client.beta.vector_stores.files.list(vector_store_id=vector_store_id)
+            if vector_store_files.data:
+                for file in vector_store_files.data:
+                    st.write(f"**File ID:** {file.id}, **Created At:** {file.created_at}")
+            else:
+                st.info("No files found in this vector store.")
+        except Exception as e:
+            st.error(f"Failed to fetch files in vector store {vector_store_id}: {e}")
+
+        # Add new files to the vector store
+        st.subheader("Add Files to Vector Store")
+        uploaded_files = st.file_uploader("Upload Files to Add to Vector Store", type=["txt", "csv", "json", "pdf"], accept_multiple_files=True)
+        if uploaded_files:
+            file_streams = []
+            for uploaded_file in uploaded_files:
+                temp_path = f"temp_{uploaded_file.name}"
+                try:
+                    # Handle PDF separately (convert to text)
+                    if uploaded_file.type == "application/pdf":
+                        pdf_reader = PdfReader(uploaded_file)
+                        pdf_text = "".join(page.extract_text() for page in pdf_reader.pages)
+                        with open(temp_path, "w") as temp_file:
+                            temp_file.write(pdf_text)
+                    else:
+                        # Save other file types as binary
+                        with open(temp_path, "wb") as temp_file:
+                            temp_file.write(uploaded_file.getbuffer())
+                    
+                    file_streams.append(open(temp_path, "rb"))
+                except Exception as e:
+                    st.error(f"Failed to process file {uploaded_file.name}: {e}")
+
+            # Upload files and add to vector store
+            if st.button("Upload and Add Files to Vector Store"):
+                try:
+                    file_batch = client.beta.vector_stores.file_batches.upload_and_poll(
+                        vector_store_id=vector_store_id, files=file_streams
+                    )
+                    st.success(f"Files successfully added to vector store {vector_store_id}.")
+                    st.write(f"Batch Status: {file_batch.status}, File Counts: {file_batch.file_counts}")
+                except Exception as e:
+                    st.error(f"Failed to add files to vector store {vector_store_id}: {e}")
+                finally:
+                    # Close and clean up temporary file streams
+                    for stream in file_streams:
+                        stream.close()
+                    for uploaded_file in uploaded_files:
+                        temp_path = f"temp_{uploaded_file.name}"
+                        if os.path.exists(temp_path):
+                            os.remove(temp_path)
+
+    # Update assistant to use vector store
+    st.subheader("Associate Vector Store with Assistant")
+    assistant_id = st.text_input("Enter Assistant ID to Associate Vector Store:")
+    if assistant_id and vector_store_id:
+        if st.button(f"Associate Vector Store {vector_store_id} with Assistant {assistant_id}"):
             try:
-                # Associate the files with the Assistant using the OpenAI API
-                assistant_id = "asst_FRTeSfXQxwiJAkYZpAXfagCK"  # Replace with actual assistant ID
                 updated_assistant = client.beta.assistants.update(
                     assistant_id=assistant_id,
-                    tools=[{"type": "file_search", "file_ids": selected_files}],  # Linking files to Assistant
+                    tool_resources={"file_search": {"vector_store_ids": [vector_store_id]}}
                 )
-                st.success(f"Selected files successfully associated with Assistant '{updated_assistant.name}'.")
+                st.success(f"Vector store {vector_store_id} successfully associated with assistant {updated_assistant.name}.")
             except Exception as e:
-                st.error(f"Failed to associate files: {e}")
-        else:
-            st.warning("No files selected to associate.")
+                st.error(f"Failed to associate vector store {vector_store_id} with assistant: {e}")
 
 # Modify System Prompt tab
 with tab3:
