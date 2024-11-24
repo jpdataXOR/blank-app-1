@@ -112,7 +112,6 @@ with tab1:
             )
 
 # File Management Tab
-# File Management Tab
 with tab2:
     st.title("File Management")
     st.sidebar.info("Upload files to be used with the Assistant.")
@@ -150,11 +149,12 @@ with tab2:
     st.subheader("Uploaded Files in OpenAI")
     try:
         files = client.files.list()  # Fetch list of files
-        if files.get("data"):
+        if files.data:
             # Display the list of files with checkboxes to associate them with the HR Assistant
-            for file in files["data"]:
-                file_name = file['filename']
-                file_id = file['id']
+            for file in files.data:
+                file_name = file.filename
+                file_id = file.id
+                # Checkbox to select which files to associate
                 if st.checkbox(f"Associate {file_name}", key=f"associate_{file_id}"):
                     st.write(f"File ID: {file_id} will be associated with the Assistant.")
                 else:
@@ -166,7 +166,8 @@ with tab2:
 
     # Step 3: Associate selected files with the Assistant
     if st.button("Associate Selected Files with HR Assistant"):
-        selected_files = [file['id'] for file in files["data"] if st.session_state.get(f"associate_{file['id']}")]
+        # Retrieve selected files from session state
+        selected_files = [file.id for file in files.data if st.session_state.get(f"associate_{file.id}")]
         if selected_files:
             try:
                 # Associate the files with the Assistant using the OpenAI API
@@ -181,7 +182,6 @@ with tab2:
         else:
             st.warning("No files selected to associate.")
 
-# Modify System Prompt Tab
 # Modify System Prompt tab
 with tab3:
     st.title("Modify System Prompt")
