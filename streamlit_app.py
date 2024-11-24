@@ -88,7 +88,7 @@ with tab1:
                 if run_response.status == "completed":
                     messages = client.beta.threads.messages.list(thread_id=st.session_state.thread.id)
                     if messages.data:
-                        assistant_message = messages.data[-1].content
+                        assistant_message = messages.data[0].content
                         st.session_state.conversation.append({"role": "assistant", "content": assistant_message})
                     else:
                         st.error("No response from Assistant.")
