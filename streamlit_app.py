@@ -87,11 +87,15 @@ with tab1:
 
                 if run_response.status == "completed":
                     messages = client.beta.threads.messages.list(thread_id=st.session_state.thread.id)
-                    if messages.data:
-                        assistant_message = messages.data[0].content
+                if messages.data:
+                    # Extract the assistant's message content (value of the text)
+                    assistant_message_block = messages.data[0].content
+                    if isinstance(assistant_message_block, dict) and "value" in assistant_message_block:
+                        assistant_message = assistant_message_block["value"]
                         st.session_state.conversation.append({"role": "assistant", "content": assistant_message})
                     else:
-                        st.error("No response from Assistant.")
+                        st.error("Unexpected response format from Assistant.")
+
                 else:
                     st.error(f"Run status: {run_response.status}")
             except Exception as e:
