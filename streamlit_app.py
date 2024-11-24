@@ -148,7 +148,39 @@ with tab2:
         st.error(f"Failed to fetch files: {e}")
 
 # Modify System Prompt Tab
+# Modify System Prompt tab
 with tab3:
+    st.title("Modify System Prompt")
+
+    if assistant:
+        # Retrieve current system prompt
+        current_prompt = assistant.instructions or "No instructions found."
+        st.text_area("Current System Prompt", value=current_prompt, height=200, key="current_prompt")
+
+        # Text area for new prompt
+        new_prompt = st.text_area("New System Prompt", height=200, key="new_prompt")
+
+        # Update the system prompt
+        if st.button("Update System Prompt"):
+            try:
+                # Update the assistant with new instructions
+                updated_assistant = client.beta.assistants.update(
+                    assistant_id=assistant.id,  # Use the ID of the assistant
+                    instructions=new_prompt,  # Update the instructions
+                    name=assistant.name,  # Retain the current name
+                    model=assistant.model,  # Retain the current model
+                    tools=assistant.tools,  # Retain existing tools
+                    temperature=assistant.temperature,  # Retain temperature
+                    top_p=assistant.top_p,  # Retain top_p value
+                    response_format=assistant.response_format,  # Retain response format
+                )
+
+                # Confirm update
+                st.success("System Prompt updated successfully!")
+                st.info(f"New instructions: {updated_assistant.instructions}")
+            except Exception as e:
+                st.error(f"Failed to update System Prompt: {e}")
+
     st.title("Modify System Prompt")
     if assistant:
         current_prompt = assistant.get("instructions", "No instructions found.")
