@@ -180,17 +180,3 @@ with tab3:
                 st.info(f"New instructions: {updated_assistant.instructions}")
             except Exception as e:
                 st.error(f"Failed to update System Prompt: {e}")
-
-    st.title("Modify System Prompt")
-    if assistant:
-        current_prompt = assistant.get("instructions", "No instructions found.")
-        st.text_area("Current System Prompt", value=current_prompt, height=200, key="current_prompt")
-        new_prompt = st.text_area("New System Prompt", height=200, key="new_prompt")
-        if st.button("Update System Prompt"):
-            try:
-                assistant = client.beta.assistants.update(
-                    assistant_id=assistant_id, instructions=new_prompt
-                )
-                st.success("System Prompt updated successfully!")
-            except Exception as e:
-                st.error(f"Failed to update System Prompt: {e}")
