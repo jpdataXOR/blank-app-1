@@ -119,15 +119,23 @@ with tab2:
     # List all vector stores
     st.subheader("List of Vector Stores")
     try:
+        # Fetch vector stores
         vector_stores = client.beta.vector_stores.list()
-        if vector_stores.data:
+
+        # Check if the 'data' attribute contains stores
+        if vector_stores.data and isinstance(vector_stores.data, list):
+            st.subheader("Vector Stores")
             for store in vector_stores.data:
-                st.write(f"**Name:** {store.name}, **ID:** {store.id}")
-                st.write(f"**Created At:** {store.created_at}, **Total Files:** {store.file_counts['total']}")
+                st.write(f"**Name:** {store.name}")
+                st.write(f"**ID:** {store.id}")
+                st.write(f"**Created At:** {store.created_at}")
+                st.write(f"**Total Files:** {store.file_counts.total}")
+                st.write("---")
         else:
             st.info("No vector stores found.")
     except Exception as e:
         st.error(f"Failed to fetch vector stores: {e}")
+
 
     # Select a vector store to manage files
     vector_store_id = st.text_input("Enter Vector Store ID to Manage Files:")
