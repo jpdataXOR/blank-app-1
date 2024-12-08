@@ -3,6 +3,10 @@ import urllib.parse
 from openai import OpenAI
 import os
 from PyPDF2 import PdfReader
+import pytz
+from datetime import datetime
+
+DEFAULT_VECTOR_STORE_ID = "vs_BClCFlJF7eyEEEotUipD9Flf"
 
 # Function to get API key from the URL
 def get_api_key_from_url():
@@ -111,118 +115,116 @@ with tab1:
                 unsafe_allow_html=True,
             )
 
+
+# File Management Tab
+import os
+import pytz
+from datetime import datetime
+import streamlit as st
+from PyPDF2 import PdfReader  # You need to install PyPDF2 for PDF processing
+import openai  # Assuming you're using OpenAI's client to interact with vector stores
+
+# File Management Tab
+import openai  # Assuming you're using OpenAI's client to interact with vector stores
+
 # File Management Tab
 with tab2:
     st.title("Vector Store Management")
     st.sidebar.info("Manage vector stores and associated files.")
 
-    # List all vector stores
-    st.subheader("List of Vector Stores")
+    # Default vector store ID (no user input required)
+    vector_store_id = "vs_BClCFlJF7eyEEEotUipD9Flf"  # Predefined vector store ID
+
+    st.subheader(f"Files in Vector Store: {vector_store_id}")
     try:
-        # Fetch vector stores
-        vector_stores = client.beta.vector_stores.list()
+        # Fetch files in the vector store
+        vector_store_files = client.beta.vector_stores.files.list(vector_store_id=vector_store_id)
 
-        # Check if the 'data' attribute contains stores
-        if vector_stores.data and isinstance(vector_stores.data, list):
-            st.subheader("Vector Stores")
-            for store in vector_stores.data:
-                st.write(f"**Name:** {store.name}")
-                st.write(f"**ID:** {store.id}")
-                st.write(f"**Created At:** {store.created_at}")
-                st.write(f"**Total Files:** {store.file_counts.total}")
-                st.write("---")
-        else:
-            st.info("No vector stores found.")
-    except Exception as e:
-        st.error(f"Failed to fetch vector stores: {e}")
-
-
-    # Select a vector store to manage files
-    vector_store_id = st.text_input("Enter Vector Store ID to Manage Files:")
-    if vector_store_id:
-        st.subheader(f"Files in Vector Store: {vector_store_id}")
-    # Fetch files in a vector store
-        try:
-            vector_store_files = client.beta.vector_stores.files.list(vector_store_id=vector_store_id)
-
-            # Check if the 'data' attribute contains files
-            if vector_store_files.data and isinstance(vector_store_files.data, list):
-                st.subheader(f"Files in Vector Store {vector_store_id}")
-                for file in vector_store_files.data:
-                    st.write(f"**File ID:** {file.id}")
-                    st.write(f"**Created At:** {file.created_at}")
-                    st.write(f"**Vector Store ID:** {file.vector_store_id}")
-                    st.write("---")
-            else:
-                st.info("No files found in this vector store.")
-        except Exception as e:
-            st.error(f"Failed to fetch files in vector store {vector_store_id}: {e}")
-
-            # List files in the selected vector store
-            vector_store_files = client.beta.vector_stores.files.list(vector_store_id=vector_store_id)
-            if vector_store_files.data:
-                for file in vector_store_files.data:
-                    st.write(f"**File ID:** {file.id}, **Created At:** {file.created_at}")
-            else:
-                st.info("No files found in this vector store.")
-        except Exception as e:
-            st.error(f"Failed to fetch files in vector store {vector_store_id}: {e}")
-
-        # Add new files to the vector store
-        st.subheader("Add Files to Vector Store")
-        uploaded_files = st.file_uploader("Upload Files to Add to Vector Store", type=["txt", "csv", "json", "pdf"], accept_multiple_files=True)
-        if uploaded_files:
-            file_streams = []
-            for uploaded_file in uploaded_files:
-                temp_path = f"temp_{uploaded_file.name}"
+        if vector_store_files.data and isinstance(vector_store_files.data, list):
+            file_data = []
+            for file in vector_store_files.data:
+                # Fetch file details to get the filename
                 try:
-                    # Handle PDF separately (convert to text)
-                    if uploaded_file.type == "application/pdf":
-                        pdf_reader = PdfReader(uploaded_file)
-                        pdf_text = "".join(page.extract_text() for page in pdf_reader.pages)
-                        with open(temp_path, "w") as temp_file:
-                            temp_file.write(pdf_text)
-                    else:
-                        # Save other file types as binary
-                        with open(temp_path, "wb") as temp_file:
-                            temp_file.write(uploaded_file.getbuffer())
-                    
-                    file_streams.append(open(temp_path, "rb"))
-                except Exception as e:
-                    st.error(f"Failed to process file {uploaded_file.name}: {e}")
+                    file_details = client.files.retrieve(file_id=file.id)
 
-            # Upload files and add to vector store
-            if st.button("Upload and Add Files to Vector Store"):
-                try:
-                    file_batch = client.beta.vector_stores.file_batches.upload_and_poll(
-                        vector_store_id=vector_store_id, files=file_streams
+                    # Convert timestamp to AEST
+                    created_at_utc = datetime.utcfromtimestamp(file.created_at)
+                    created_at_aest = created_at_utc.astimezone(pytz.timezone("Australia/Sydney"))
+
+                    file_data.append(
+                        {
+                            "Filename": file_details.filename,
+                            "File ID": file.id,
+                            "Created At (AEST)": created_at_aest.strftime("%Y-%m-%d %H:%M:%S"),
+                        }
                     )
-                    st.success(f"Files successfully added to vector store {vector_store_id}.")
-                    st.write(f"Batch Status: {file_batch.status}, File Counts: {file_batch.file_counts}")
                 except Exception as e:
-                    st.error(f"Failed to add files to vector store {vector_store_id}: {e}")
-                finally:
-                    # Close and clean up temporary file streams
-                    for stream in file_streams:
-                        stream.close()
-                    for uploaded_file in uploaded_files:
-                        temp_path = f"temp_{uploaded_file.name}"
-                        if os.path.exists(temp_path):
-                            os.remove(temp_path)
+                    st.error(f"Failed to fetch details for file {file.id}: {e}")
 
-    # Update assistant to use vector store
-    st.subheader("Associate Vector Store with Assistant")
-    assistant_id = st.text_input("Enter Assistant ID to Associate Vector Store:")
-    if assistant_id and vector_store_id:
-        if st.button(f"Associate Vector Store {vector_store_id} with Assistant {assistant_id}"):
+            if file_data:
+                st.table(file_data)  # Display table of files
+            else:
+                st.info("No files found in the vector store.")
+        else:
+            st.info("No files found in the vector store.")
+    except Exception as e:
+        st.error(f"Failed to fetch files from vector store: {e}")
+
+    # Add new files to the vector store
+    st.subheader("Add Files to Vector Store")
+    uploaded_files = st.file_uploader("Upload Files to Add to Vector Store", type=["txt", "csv", "json", "pdf"], accept_multiple_files=True)
+    if uploaded_files:
+        file_streams = []
+        for uploaded_file in uploaded_files:
+            temp_path = f"temp_{uploaded_file.name}"
             try:
-                updated_assistant = client.beta.assistants.update(
-                    assistant_id=assistant_id,
-                    tool_resources={"file_search": {"vector_store_ids": [vector_store_id]}}
-                )
-                st.success(f"Vector store {vector_store_id} successfully associated with assistant {updated_assistant.name}.")
+                # Handle PDF separately (convert to text)
+                if uploaded_file.type == "application/pdf":
+                    pdf_reader = PdfReader(uploaded_file)
+                    pdf_text = "".join(page.extract_text() for page in pdf_reader.pages)
+                    with open(temp_path, "w") as temp_file:
+                        temp_file.write(pdf_text)
+                else:
+                    # Save other file types as binary
+                    with open(temp_path, "wb") as temp_file:
+                        temp_file.write(uploaded_file.getbuffer())
+                
+                file_streams.append(open(temp_path, "rb"))
             except Exception as e:
-                st.error(f"Failed to associate vector store {vector_store_id} with assistant: {e}")
+                st.error(f"Failed to process file {uploaded_file.name}: {e}")
+
+        # Upload files and add to vector store
+        if st.button("Upload and Add Files to Vector Store"):
+            try:
+                file_batch = client.beta.vector_stores.file_batches.upload_and_poll(
+                    vector_store_id=vector_store_id, files=file_streams
+                )
+                st.success(f"Files successfully added to vector store {vector_store_id}.")
+                st.write(f"Batch Status: {file_batch.status}, File Counts: {file_batch.file_counts}")
+            except Exception as e:
+                st.error(f"Failed to add files to vector store {vector_store_id}: {e}")
+            finally:
+                # Close and clean up temporary file streams
+                for stream in file_streams:
+                    stream.close()
+                for uploaded_file in uploaded_files:
+                    temp_path = f"temp_{uploaded_file.name}"
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+
+    # Automatically Associate Vector Store with Assistant (no need for user input)
+    st.subheader("Associate Vector Store with Assistant")
+    assistant_id = "asst_FRTeSfXQxwiJAkYZpAXfagCK"  # Predefined assistant ID
+    if vector_store_id and assistant_id:
+            if st.button(f"Associate Vector Store {vector_store_id} with Assistant {assistant_id}"):
+                try:
+                    updated_assistant = client.beta.assistants.update(
+                        assistant_id=assistant_id,
+                        tool_resources={"file_search": {"vector_store_ids": [vector_store_id]}}
+                    )
+                    st.success(f"Vector store {vector_store_id} successfully associated with assistant {updated_assistant.name}.")
+                except Exception as e:
+                    st.error(f"Failed to associate vector store {vector_store_id} with assistant: {e}")
 
 # Modify System Prompt tab
 with tab3:
