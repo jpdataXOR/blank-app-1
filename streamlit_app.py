@@ -135,40 +135,44 @@ with tab2:
     # Default vector store ID (no user input required)
     vector_store_id = "vs_BClCFlJF7eyEEEotUipD9Flf"  # Predefined vector store ID
 
-    st.subheader(f"Files in Vector Store: {vector_store_id}")
-    try:
-        # Fetch files in the vector store
-        vector_store_files = client.beta.vector_stores.files.list(vector_store_id=vector_store_id)
+    # Function to fetch and display files in the vector store
+    def fetch_and_display_files(vector_store_id):
+        try:
+            vector_store_files = client.beta.vector_stores.files.list(vector_store_id=vector_store_id)
 
-        if vector_store_files.data and isinstance(vector_store_files.data, list):
-            file_data = []
-            for file in vector_store_files.data:
-                # Fetch file details to get the filename
-                try:
-                    file_details = client.files.retrieve(file_id=file.id)
+            if vector_store_files.data and isinstance(vector_store_files.data, list):
+                file_data = []
+                for file in vector_store_files.data:
+                    try:
+                        file_details = client.files.retrieve(file_id=file.id)
 
-                    # Convert timestamp to AEST
-                    created_at_utc = datetime.utcfromtimestamp(file.created_at)
-                    created_at_aest = created_at_utc.astimezone(pytz.timezone("Australia/Sydney"))
+                        # Convert timestamp to AEST
+                        created_at_utc = datetime.utcfromtimestamp(file.created_at)
+                        created_at_aest = created_at_utc.astimezone(pytz.timezone("Australia/Sydney"))
 
-                    file_data.append(
-                        {
-                            "Filename": file_details.filename,
-                            "File ID": file.id,
-                            "Created At (AEST)": created_at_aest.strftime("%Y-%m-%d %H:%M:%S"),
-                        }
-                    )
-                except Exception as e:
-                    st.error(f"Failed to fetch details for file {file.id}: {e}")
+                        file_data.append(
+                            {
+                                "Filename": file_details.filename,
+                                "File ID": file.id,
+                                "Created At (AEST)": created_at_aest.strftime("%Y-%m-%d %H:%M:%S"),
+                            }
+                        )
+                    except Exception as e:
+                        st.error(f"Failed to fetch details for file {file.id}: {e}")
 
-            if file_data:
-                st.table(file_data)  # Display table of files
+                if file_data:
+                    # Display table of files
+                    st.table(file_data)
+                else:
+                    st.info("No files found in the vector store.")
             else:
                 st.info("No files found in the vector store.")
-        else:
-            st.info("No files found in the vector store.")
-    except Exception as e:
-        st.error(f"Failed to fetch files from vector store: {e}")
+        except Exception as e:
+            st.error(f"Failed to fetch files from vector store: {e}")
+
+    # Display initial files in vector store
+    st.subheader(f"Files in Vector Store: {vector_store_id}")
+    fetch_and_display_files(vector_store_id)
 
     # Add new files to the vector store
     st.subheader("Add Files to Vector Store")
@@ -201,6 +205,23 @@ with tab2:
                 )
                 st.success(f"Files successfully added to vector store {vector_store_id}.")
                 st.write(f"Batch Status: {file_batch.status}, File Counts: {file_batch.file_counts}")
+
+                # Associate vector store with assistant after files are uploaded
+                assistant_id = "asst_FRTeSfXQxwiJAkYZpAXfagCK"  # Predefined assistant ID
+                if vector_store_id and assistant_id:
+                    try:
+                        updated_assistant = client.beta.assistants.update(
+                            assistant_id=assistant_id,
+                            tool_resources={"file_search": {"vector_store_ids": [vector_store_id]}}
+                        )
+                        st.success(f"Vector store {vector_store_id} successfully associated with assistant {updated_assistant.name}.")
+                    except Exception as e:
+                        st.error(f"Failed to associate vector store {vector_store_id} with assistant: {e}")
+
+                # Refresh the list of files in the vector store after upload and association
+                st.subheader(f"Updated Files in Vector Store: {vector_store_id}")
+                fetch_and_display_files(vector_store_id)
+
             except Exception as e:
                 st.error(f"Failed to add files to vector store {vector_store_id}: {e}")
             finally:
@@ -211,20 +232,6 @@ with tab2:
                     temp_path = f"temp_{uploaded_file.name}"
                     if os.path.exists(temp_path):
                         os.remove(temp_path)
-
-    # Automatically Associate Vector Store with Assistant (no need for user input)
-    st.subheader("Associate Vector Store with Assistant")
-    assistant_id = "asst_FRTeSfXQxwiJAkYZpAXfagCK"  # Predefined assistant ID
-    if vector_store_id and assistant_id:
-            if st.button(f"Associate Vector Store {vector_store_id} with Assistant {assistant_id}"):
-                try:
-                    updated_assistant = client.beta.assistants.update(
-                        assistant_id=assistant_id,
-                        tool_resources={"file_search": {"vector_store_ids": [vector_store_id]}}
-                    )
-                    st.success(f"Vector store {vector_store_id} successfully associated with assistant {updated_assistant.name}.")
-                except Exception as e:
-                    st.error(f"Failed to associate vector store {vector_store_id} with assistant: {e}")
 
 # Modify System Prompt tab
 with tab3:
