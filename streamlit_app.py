@@ -126,14 +126,13 @@ with tab1:
             unsafe_allow_html=True,
         )
 
-
-# File Management Tab
 import os
 import pytz
 from datetime import datetime
 import streamlit as st
 from PyPDF2 import PdfReader  # You need to install PyPDF2 for PDF processing
-import openai 
+import openai
+
 with tab2:
     st.title(f"Vector Store Management for {selected_customer}")
     st.sidebar.info(f"Manage vector store and associated files for {selected_customer}.")
@@ -157,13 +156,14 @@ with tab2:
                                 "Filename": file_details.filename,
                                 "File ID": file.id,
                                 "Created At (AEST)": created_at_aest.strftime("%Y-%m-%d %H:%M:%S"),
+                                "Delete": st.button(f"Delete {file_details.filename}", key=f"delete_{file.id}", on_click=delete_file, args=(file.id,))
                             }
                         )
                     except Exception as e:
                         st.error(f"Failed to fetch details for file {file.id}: {e}")
 
                 if file_data:
-                    # Display table of files
+                    # Display table of files with delete option
                     st.table(file_data)
                 else:
                     st.info("No files found in the vector store.")
@@ -171,6 +171,20 @@ with tab2:
                 st.info("No files found in the vector store.")
         except Exception as e:
             st.error(f"Failed to fetch files from vector store: {e}")
+
+    # Function to delete a file from the vector store
+    def delete_file(file_id):
+        try:
+            # Delete file from vector store
+            delete_response = client.files.delete(file_id=file_id)
+            if delete_response.status == "completed":
+                st.success(f"File {file_id} successfully deleted.")
+                # Refresh the list of files after deletion
+                fetch_and_display_files(selected_vector_store)
+            else:
+                st.error(f"Failed to delete file {file_id}.")
+        except Exception as e:
+            st.error(f"Error while deleting file {file_id}: {e}")
 
     # Display initial files in vector store
     st.subheader(f"Files in Vector Store: {selected_vector_store}")
@@ -215,7 +229,7 @@ with tab2:
                     try:
                         updated_assistant = client.beta.assistants.update(
                             assistant_id=selected_assistant,
-                            tool_resources={"file_search": {"vector_store_ids": [selected_vector_store]}},
+                            tool_resources={"file_search": {"vector_store_ids": [selected_vector_store]}} ,
                         )
                         st.success(
                             f"Vector store {selected_vector_store} successfully associated with assistant {updated_assistant.name}."
