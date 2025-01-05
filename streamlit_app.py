@@ -6,7 +6,17 @@ from PyPDF2 import PdfReader
 import pytz
 from datetime import datetime
 
-DEFAULT_VECTOR_STORE_ID = "vs_BClCFlJF7eyEEEotUipD9Flf"
+# Customer-specific assistant and vector store mapping
+CUSTOMER_ASSISTANTS = {
+    "Customer1": {
+        "assistant_id": "asst_FRTeSfXQxwiJAkYZpAXfagCK",  # Customer1 Assistant ID
+        "vector_store_id": "vs_BClCFlJF7eyEEEotUipD9Flf",  # Customer1 Vector Store ID
+    },
+    "Customer2": {
+        "assistant_id": "asst_1fJ30Q1fYwdMi1an0t7oiBW6",  # Customer2 Assistant ID
+        "vector_store_id": "vs_5b9tWd20JoaTaaRbA3MgWSje",  # Customer2 Vector Store ID
+    },
+}
 
 # Function to get API key from the URL
 def get_api_key_from_url():
@@ -32,30 +42,34 @@ if api_key:
     try:
         client = OpenAI(api_key=api_key)
         st.success("API key successfully loaded!")
-
-        # Load the Assistant
-        assistant_id = "asst_FRTeSfXQxwiJAkYZpAXfagCK"  # Replace with your assistant ID
-        try:
-            assistant = client.beta.assistants.retrieve(assistant_id)
-            st.sidebar.success(f"Assistant '{assistant.name}' loaded successfully!")
-        except Exception as e:
-            st.error(f"Failed to load Assistant: {e}")
-            assistant = None
     except Exception as e:
         st.error(f"Failed to initialize OpenAI client: {e}")
-        assistant = None
+        client = None
 else:
     st.error("Please provide a valid OpenAI API key.")
-    assistant = None
+    client = None
+
+# Sidebar dropdown for customer selection
+selected_customer = st.sidebar.selectbox(
+    "Select Customer",
+    options=list(CUSTOMER_ASSISTANTS.keys()),
+    index=0  # Default to the first customer
+)
+
+# Get the assistant and vector store for the selected customer
+assistant_details = CUSTOMER_ASSISTANTS[selected_customer]
+assistant_id = assistant_details["assistant_id"]
+vector_store_id = assistant_details["vector_store_id"]
+
+st.sidebar.info(f"Selected Customer: {selected_customer}\nAssistant ID: {assistant_id}\nVector Store ID: {vector_store_id}")
 
 # Tabs for functionalities
 tab1, tab2, tab3 = st.tabs(["Chat Assistant", "File Management", "Modify System Prompt"])
 
 # Chat Assistant Tab
 with tab1:
-    if api_key and assistant:
-        st.title("Chat with HR Assistant")
-        st.sidebar.info("Start a conversation with your Assistant!")
+    if client:
+        st.title(f"Chat with {selected_customer}'s HR Assistant")
 
         # Initialize session state for conversation
         if "conversation" not in st.session_state:
@@ -86,14 +100,12 @@ with tab1:
                     run_response = client.beta.threads.runs.create_and_poll(
                         thread_id=st.session_state.thread.id,
                         assistant_id=assistant_id,
-                        instructions="Please address HR issues or Questions of the User"
+                        instructions=f"Please address HR issues or questions for {selected_customer}"
                     )
 
                 if run_response.status == "completed":
                     messages = client.beta.threads.messages.list(thread_id=st.session_state.thread.id)
                     if messages.data:
-                    # Extract the assistant's message content (value of the text)
-                     # Extract the assistant's message content (value of the text)
                         assistant_message_block = messages.data[0].content[0].text.value
                         st.session_state.conversation.append({"role": "assistant", "content": assistant_message_block})
                     else:
@@ -115,25 +127,10 @@ with tab1:
                 unsafe_allow_html=True,
             )
 
-
-# File Management Tab
-import os
-import pytz
-from datetime import datetime
-import streamlit as st
-from PyPDF2 import PdfReader  # You need to install PyPDF2 for PDF processing
-import openai  # Assuming you're using OpenAI's client to interact with vector stores
-
-# File Management Tab
-import openai  # Assuming you're using OpenAI's client to interact with vector stores
-
 # File Management Tab
 with tab2:
-    st.title("Vector Store Management")
-    st.sidebar.info("Manage vector stores and associated files.")
-
-    # Default vector store ID (no user input required)
-    vector_store_id = "vs_BClCFlJF7eyEEEotUipD9Flf"  # Predefined vector store ID
+    st.title(f"Vector Store Management for {selected_customer}")
+    st.subheader(f"Files in Vector Store: {vector_store_id}")
 
     # Function to fetch and display files in the vector store
     def fetch_and_display_files(vector_store_id):
@@ -170,8 +167,6 @@ with tab2:
         except Exception as e:
             st.error(f"Failed to fetch files from vector store: {e}")
 
-    # Display initial files in vector store
-    st.subheader(f"Files in Vector Store: {vector_store_id}")
     fetch_and_display_files(vector_store_id)
 
     # Add new files to the vector store
@@ -206,20 +201,6 @@ with tab2:
                 st.success(f"Files successfully added to vector store {vector_store_id}.")
                 st.write(f"Batch Status: {file_batch.status}, File Counts: {file_batch.file_counts}")
 
-                # Associate vector store with assistant after files are uploaded
-                assistant_id = "asst_FRTeSfXQxwiJAkYZpAXfagCK"  # Predefined assistant ID
-                if vector_store_id and assistant_id:
-                    try:
-                        updated_assistant = client.beta.assistants.update(
-                            assistant_id=assistant_id,
-                            tool_resources={"file_search": {"vector_store_ids": [vector_store_id]}}
-                        )
-                        st.success(f"Vector store {vector_store_id} successfully associated with assistant {updated_assistant.name}.")
-                    except Exception as e:
-                        st.error(f"Failed to associate vector store {vector_store_id} with assistant: {e}")
-
-                # Refresh the list of files in the vector store after upload and association
-                st.subheader(f"Updated Files in Vector Store: {vector_store_id}")
                 fetch_and_display_files(vector_store_id)
 
             except Exception as e:
@@ -237,31 +218,19 @@ with tab2:
 with tab3:
     st.title("Modify System Prompt")
 
-    if assistant:
-        # Retrieve current system prompt
-        current_prompt = assistant.instructions or "No instructions found."
-        st.text_area("Current System Prompt", value=current_prompt, height=200, key="current_prompt")
+    if client:
+        try:
+            assistant = client.beta.assistants.retrieve(assistant_id)
+            current_prompt = assistant.instructions or "No instructions found."
+            st.text_area("Current System Prompt", value=current_prompt, height=200, key="current_prompt", disabled=True)
 
-        # Text area for new prompt
-        new_prompt = st.text_area("New System Prompt", height=200, key="new_prompt")
-
-        # Update the system prompt
-        if st.button("Update System Prompt"):
-            try:
-                # Update the assistant with new instructions
+            # Modify the prompt
+            new_prompt = st.text_area("Modify System Prompt", value=current_prompt, height=200, key="new_prompt")
+            if st.button("Update Prompt"):
                 updated_assistant = client.beta.assistants.update(
-                    assistant_id=assistant.id,  # Use the ID of the assistant
-                    instructions=new_prompt,  # Update the instructions
-                    name=assistant.name,  # Retain the current name
-                    model=assistant.model,  # Retain the current model
-                    tools=assistant.tools,  # Retain existing tools
-                    temperature=assistant.temperature,  # Retain temperature
-                    top_p=assistant.top_p,  # Retain top_p value
-                    response_format=assistant.response_format,  # Retain response format
+                    assistant_id=assistant_id,
+                    instructions=new_prompt
                 )
-
-                # Confirm update
-                st.success("System Prompt updated successfully!")
-                st.info(f"New instructions: {updated_assistant.instructions}")
-            except Exception as e:
-                st.error(f"Failed to update System Prompt: {e}")
+                st.success(f"System prompt updated successfully for assistant {updated_assistant.name}.")
+        except Exception as e:
+            st.error(f"Failed to retrieve or update assistant: {e}")
