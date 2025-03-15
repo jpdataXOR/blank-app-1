@@ -218,7 +218,7 @@ with tab2:
         # Upload files and add to vector store
         if st.button("Upload and Add Files to Vector Store"):
             try:
-                file_batch = client.beta.vector_stores.file_batches.upload_and_poll(
+                file_batch = client.vector_stores.file_batches.upload_and_poll(
                     vector_store_id=selected_vector_store, files=file_streams
                 )
                 st.success(f"Files successfully added to vector store {selected_vector_store}.")
