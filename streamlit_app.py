@@ -140,7 +140,7 @@ with tab2:
     # Function to fetch and display files in the vector store
     def fetch_and_display_files(vector_store_id):
         try:
-            vector_store_files = client.beta.vector_stores.files.list(vector_store_id=vector_store_id)
+            vector_store_files = client.vector_stores.files.list(vector_store_id=vector_store_id)
             if vector_store_files.data and isinstance(vector_store_files.data, list):
                 file_data = []
                 for file in vector_store_files.data:
